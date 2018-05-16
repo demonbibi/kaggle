@@ -2,23 +2,27 @@
 # coding: utf-8
 '''
 Created on 2017-10-26
-Update  on 2017-10-26
-Author: 片刻
+Update  on 2018-05-16
+Author: 片刻/ccyf00
 Github: https://github.com/apachecn/kaggle
 '''
 
+import os.path
 import csv
 import time
+import numpy as np
 import pandas as pd
-from numpy import shape, ravel
+from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
+
+data_dir = '/opt/data/kaggle/getting-started/digit-recognizer/'
 
 
 # 加载数据
 def opencsv():
     # 使用 pandas 打开
-    data = pd.read_csv('train.csv')
-    data1 = pd.read_csv('test.csv')
+    data = pd.read_csv(os.path.join(data_dir, 'train.csv'))
+    data1 = pd.read_csv(os.path.join(data_dir, 'test.csv'))
 
     train_data = data.values[0:, 1:]  # 读入全部训练数据,  [行，列]
     train_label = data.values[0:, 0]  # 读取列表的第一列
@@ -43,8 +47,32 @@ def saveResult(result, csvName):
 
 def knnClassify(trainData, trainLabel):
     knnClf = KNeighborsClassifier()  # default:k = 5,defined by yourself:KNeighborsClassifier(n_neighbors=10)
-    knnClf.fit(trainData, ravel(trainLabel))  # ravel Return a contiguous flattened array.
+    knnClf.fit(trainData, np.ravel(trainLabel))  # ravel Return a contiguous flattened array.
     return knnClf
+
+
+# 数据预处理-降维 PCA主成成分分析
+def dRPCA(x_train, x_test, COMPONENT_NUM):
+    print('dimensionality reduction...')
+    trainData = np.array(x_train)
+    testData = np.array(x_test)
+    '''
+    使用说明：https://www.cnblogs.com/pinard/p/6243025.html
+    n_components>=1
+      n_components=NUM   设置占特征数量比
+    0 < n_components < 1
+      n_components=0.99  设置阈值总方差占比
+    '''
+    pca = PCA(n_components=COMPONENT_NUM, whiten=True)
+    pca.fit(trainData)  # Fit the model with X
+    pcaTrainData = pca.transform(trainData)  # Fit the model with X and 在X上完成降维.
+    pcaTestData = pca.transform(testData)  # Fit the model with X and 在X上完成降维.
+
+    # pca 方差大小、方差占比、特征数量
+    print(pca.explained_variance_, '\n', pca.explained_variance_ratio_, '\n',
+          pca.n_components_)
+    print(sum(pca.explained_variance_ratio_))
+    return pcaTrainData, pcaTestData
 
 
 def dRecognition_knn():
@@ -52,12 +80,15 @@ def dRecognition_knn():
 
     # 加载数据
     trainData, trainLabel, testData = opencsv()
-    print("trainData==>", type(trainData), shape(trainData))
-    print("trainLabel==>", type(trainLabel), shape(trainLabel))
-    print("testData==>", type(testData), shape(testData))
+    # print("trainData==>", type(trainData), shape(trainData))
+    # print("trainLabel==>", type(trainLabel), shape(trainLabel))
+    # print("testData==>", type(testData), shape(testData))
     print("load data finish")
     stop_time_l = time.time()
     print('load data time used:%f' % (stop_time_l - start_time))
+
+    # 降维处理
+    trainData, testData = dRPCA(trainData, testData, 35)
 
     # 模型训练
     knnClf = knnClassify(trainData, trainLabel)
@@ -66,10 +97,7 @@ def dRecognition_knn():
     testLabel = knnClf.predict(testData)
 
     # 结果的输出
-    saveResult(
-        testLabel,
-        'result_knn_3.6.csv'
-    )
+    saveResult(testLabel, os.path.join(data_dir, 'Result_sklearn_knn.csv'))
     print("finish!")
     stop_time_r = time.time()
     print('classify time used:%f' % (stop_time_r - start_time))
